@@ -1,11 +1,8 @@
-# Worker名称，和你控制台的163yx保持一致
 name = "163yx"
 main = "163yx.js"
 compatibility_date = "2026-01-03"
-compatibility_flags = []
 
-# D1数据库绑定（对应截图里的变量名称DB163YX、数据库163yx）
 [[d1_databases]]
-binding = "DB163YX"          # 截图里的变量名称，必须和这个一致
-database_name = "163yx"      # 截图里选择的D1数据库名
-database_id = "你的D1数据库ID"  # 替换成你控制台D1里的数据库ID
+binding = "DB163YX"
+database_name = "163yx"
+database_id = "c46ad8f9-858d-4712-98db-d7879ec9efe1" # 替换成你的真实D1 ID
