@@ -1,15 +1,30 @@
 export default {
   async fetch(request, env, ctx) {
+    // 调试：打印绑定是否存在
+    console.log("D1绑定是否存在：", !!env.DB163YX);
     const db = env.DB163YX;
+
     async function getRandomData() {
       try {
+        if (!db) {
+          throw new Error("D1数据库绑定DB163YX不存在");
+        }
+        // 调试：打印SQL查询语句
+        console.log("执行SQL：SELECT * FROM `163yx` ORDER BY RANDOM() LIMIT 1");
         const res = await db.prepare("SELECT * FROM `163yx` ORDER BY RANDOM() LIMIT 1").run();
-        return res.results[0] || {msg: "表中暂无数据"};
+        // 调试：打印查询结果
+        console.log("查询结果：", res);
+        const data = res.results[0];
+        console.log("抽取的单条数据：", data);
+        return data || { msg: "表中暂无数据，请先插入测试数据" };
       } catch (err) {
-        return {error: "数据库错误：" + err.message};
+        // 调试：打印完整错误信息
+        console.error("数据库查询错误：", err.message, err.stack);
+        return { error: "数据库读取失败：" + err.message };
       }
     }
 
+    // AJAX接口
     if (request.url.includes("?getRandom")) {
       const data = await getRandomData();
       return new Response(JSON.stringify(data), {
@@ -20,8 +35,11 @@ export default {
       });
     }
 
-    const initData = await getRandomData();
-    return new Response(`
+    // 主页面
+    try {
+      const initData = await getRandomData();
+      console.log("初始化数据：", initData);
+      return new Response(`
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -43,9 +61,8 @@ export default {
     .refresh-btn{padding:12px 36px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer;transition:all 0.3s;}
     .refresh-btn:hover{background:#1d4ed8;transform:translateY(-2px);}
     .refresh-btn:active{transform:translateY(0);}
-    .error{color:#ef4444;background:#fef2f2;}
+    .error{color:#ef4444;background:#fef2f2;padding:10px;border-radius:4px;}
     .success{color:#16a34a;}
-    .tip{font-size:14px;color:#64748b;margin-top:5px;}
   </style>
 </head>
 <body>
@@ -54,56 +71,77 @@ export default {
     <div class="result" id="result">${formatData(initData)}</div>
     <button class="refresh-btn" onclick="refreshData()">刷新随机内容</button>
   </div>
-
   <script>
-    // 格式化数据：按列分行，每行加复制按钮
+    // 容错的格式化函数
     function formatData(data) {
-      if(data.error) return \`<div class="error">${JSON.stringify(data.error)}</div>\`;
+      if (!data || typeof data !== 'object') {
+        return '<div class="error">数据格式异常</div>';
+      }
+      if (data.error) {
+        return \`<div class="error">\${data.error}</div>\`;
+      }
+      if (Object.keys(data).length === 0) {
+        return '<div>表中暂无数据</div>';
+      }
       let html = '';
-      for(let key in data) {
-        html += \`
-        <div class="row">
-          <div class="key">\${key}：</div>
-          <div class="value" id="val-\${key}">\${data[key]}</div>
-          <button class="copy-btn" onclick="copyText('val-\${key}', this)">复制</button>
-        </div>\`;
+      for (const key in data) {
+        if (Object.hasOwn(data, key)) {
+          const value = data[key] ?? '空值';
+          html += \`
+          <div class="row">
+            <div class="key">\${key}：</div>
+            <div class="value" id="val-\${key}">\${value}</div>
+            <button class="copy-btn" onclick="copyText('val-\${key}', this)">复制</button>
+          </div>\`;
+        }
       }
       return html;
     }
 
-    // 复制功能+成功提示
+    // 复制功能
     function copyText(id, btn) {
-      const text = document.getElementById(id).innerText;
-      navigator.clipboard.writeText(text).then(() => {
-        const oldTxt = btn.innerText;
-        btn.innerText = "已复制！";
-        btn.style.background = "#16a34a";
-        setTimeout(() => {
-          btn.innerText = oldTxt;
-          btn.style.background = "#1d4ed8";
-        }, 1500);
-      }).catch(() => {
-        alert("复制失败，请手动复制");
-      });
+      try {
+        const text = document.getElementById(id).innerText;
+        navigator.clipboard.writeText(text).then(() => {
+          const oldText = btn.innerText;
+          btn.innerText = "已复制";
+          btn.style.background = "#16a34a";
+          setTimeout(() => {
+            btn.innerText = oldText;
+            btn.style.background = "#1d4ed8";
+          }, 1500);
+        });
+      } catch (err) {
+        alert("复制失败：" + err.message);
+      }
     }
 
     // 刷新功能
     async function refreshData() {
       const resultDom = document.getElementById('result');
-      resultDom.innerHTML = "<div style='text-align:center;padding:20px;'>加载中...</div>";
+      resultDom.innerHTML = '<div style="text-align:center;">加载中...</div>';
       try {
         const res = await fetch(window.location.href + "?getRandom");
         const data = await res.json();
         resultDom.innerHTML = formatData(data);
-        if(data.error) resultDom.classList.add('error');
-        else resultDom.classList.remove('error');
       } catch (err) {
-        resultDom.innerHTML = "<div class='error'>刷新失败，请重试</div>";
+        resultDom.innerHTML = '<div class="error">刷新失败，请重试</div>';
+        console.error("刷新错误：", err);
       }
     }
   </script>
 </body>
 </html>
-    `, {headers: {"Content-Type": "text/html;charset=utf-8"}});
+      `, {
+        headers: { "Content-Type": "text/html;charset=utf-8" }
+      });
+    } catch (pageErr) {
+      // 捕获页面渲染的所有错误
+      console.error("页面渲染错误：", pageErr.message);
+      return new Response(`页面加载失败：${pageErr.message}`, {
+        status: 500,
+        headers: { "Content-Type": "text/plain;charset=utf-8" }
+      });
+    }
   },
 };
