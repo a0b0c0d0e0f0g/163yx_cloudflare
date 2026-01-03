@@ -1,6 +1,6 @@
 export default {
   async fetch(request, env, ctx) {
-    const db = env.DB;
+    const db = env.DB163YX;
     async function getRandomData() {
       try {
         // 关键修正：数字开头表名加反引号`
