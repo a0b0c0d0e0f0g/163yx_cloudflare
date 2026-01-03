@@ -1,30 +1,47 @@
 export default {
   async fetch(request, env, ctx) {
-    // 调试：打印绑定是否存在
     console.log("D1绑定是否存在：", !!env.DB163YX);
     const db = env.DB163YX;
 
     async function getRandomData() {
       try {
-        if (!db) {
-          throw new Error("D1数据库绑定DB163YX不存在");
-        }
-        // 调试：打印SQL查询语句
-        console.log("执行SQL：SELECT * FROM `163yx` ORDER BY RANDOM() LIMIT 1");
+        if (!db) throw new Error("D1数据库绑定DB163YX不存在");
         const res = await db.prepare("SELECT * FROM `163yx` ORDER BY RANDOM() LIMIT 1").run();
-        // 调试：打印查询结果
-        console.log("查询结果：", res);
         const data = res.results[0];
         console.log("抽取的单条数据：", data);
         return data || { msg: "表中暂无数据，请先插入测试数据" };
       } catch (err) {
-        // 调试：打印完整错误信息
-        console.error("数据库查询错误：", err.message, err.stack);
+        console.error("数据库查询错误：", err.message);
         return { error: "数据库读取失败：" + err.message };
       }
     }
 
-    // AJAX接口
+    // 【关键修复】把formatData移到服务端，作为独立函数
+    function formatData(data) {
+      if (!data || typeof data !== 'object') {
+        return '<div class="error">数据格式异常</div>';
+      }
+      if (data.error) {
+        return `<div class="error">${data.error}</div>`;
+      }
+      if (Object.keys(data).length === 0) {
+        return '<div>表中暂无数据</div>';
+      }
+      let html = '';
+      for (const key in data) {
+        if (Object.hasOwn(data, key)) {
+          const value = data[key] ?? '空值';
+          html += `
+          <div class="row">
+            <div class="key">${key}：</div>
+            <div class="value" id="val-${key}">${value}</div>
+            <button class="copy-btn" onclick="copyText('val-${key}', this)">复制</button>
+          </div>`;
+        }
+      }
+      return html;
+    }
+
     if (request.url.includes("?getRandom")) {
       const data = await getRandomData();
       return new Response(JSON.stringify(data), {
@@ -35,10 +52,9 @@ export default {
       });
     }
 
-    // 主页面
     try {
       const initData = await getRandomData();
-      console.log("初始化数据：", initData);
+      const initHtml = formatData(initData); // 服务端调用函数
       return new Response(`
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -68,11 +84,11 @@ export default {
 <body>
   <div class="container">
     <h2>163yx 随机抽取</h2>
-    <div class="result" id="result">${formatData(initData)}</div>
+    <div class="result" id="result">${initHtml}</div>
     <button class="refresh-btn" onclick="refreshData()">刷新随机内容</button>
   </div>
   <script>
-    // 容错的格式化函数
+    // 前端复用的格式化函数（供刷新时使用）
     function formatData(data) {
       if (!data || typeof data !== 'object') {
         return '<div class="error">数据格式异常</div>';
@@ -98,7 +114,6 @@ export default {
       return html;
     }
 
-    // 复制功能
     function copyText(id, btn) {
       try {
         const text = document.getElementById(id).innerText;
@@ -116,7 +131,6 @@ export default {
       }
     }
 
-    // 刷新功能
     async function refreshData() {
       const resultDom = document.getElementById('result');
       resultDom.innerHTML = '<div style="text-align:center;">加载中...</div>';
@@ -126,7 +140,6 @@ export default {
         resultDom.innerHTML = formatData(data);
       } catch (err) {
         resultDom.innerHTML = '<div class="error">刷新失败，请重试</div>';
-        console.error("刷新错误：", err);
       }
     }
   </script>
@@ -136,7 +149,6 @@ export default {
         headers: { "Content-Type": "text/html;charset=utf-8" }
       });
     } catch (pageErr) {
-      // 捕获页面渲染的所有错误
       console.error("页面渲染错误：", pageErr.message);
       return new Response(`页面加载失败：${pageErr.message}`, {
         status: 500,
