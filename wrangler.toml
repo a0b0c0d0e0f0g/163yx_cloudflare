@@ -1,10 +1,11 @@
-name = "163yx"  # 匹配CI要求的Worker名称
+# Worker名称，和你控制台的163yx保持一致
+name = "163yx"
 main = "163yx.js"
-compatibility_date = "2026-01-03"  # 解决核心报错
+compatibility_date = "2026-01-03"
 compatibility_flags = []
 
-# 绑定D1数据库（名字DB和代码里一致，替换成你的数据库ID）
+# D1数据库绑定（对应截图里的变量名称DB163YX、数据库163yx）
 [[d1_databases]]
-binding = "DB"
-database_name = "你的D1数据库名" # 填你之前建的163yx-db
-database_id = "你的D1数据库ID" # 控制台D1里复制
+binding = "DB163YX"          # 截图里的变量名称，必须和这个一致
+database_name = "163yx"      # 截图里选择的D1数据库名
+database_id = "你的D1数据库ID"  # 替换成你控制台D1里的数据库ID
