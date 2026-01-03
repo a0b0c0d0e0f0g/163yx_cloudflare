@@ -52,7 +52,7 @@ export default {
     // 刷新数据核心逻辑（无刷新更新）
     async function refreshData() {
       const resultDom = document.getElementById('result');
-      resultDom.innerHTML = "加载中...";
+      resultDom.innerHTML = "加载中。。.";
       try {
         const res = await fetch(window.location.href + "?getRandom");
         const data = await res.json();
